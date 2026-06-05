@@ -22,10 +22,10 @@ function GeneralGmvTablazat() {
     sheet.clearFormats();
 
     // ==================== DINAMIKUS OSZLOPOK ====================
-    const salesTotalCol   = getTotalColumn(salesSheet, 5, 3);      // Sales: C5-től
-    const ordersTotalCol  = getTotalColumn(ordersSheet, 3, 2);     // Orders: B3-tól
-    const wgrGmvCol       = getTotalColumn(wgrSheet, 4, 3);        // WGR GMV: C4-től
-    const wgrProfitCol    = getProfitColumn(wgrSheet);             // WGR Profit: első üres cella előtti oszlop a 4. sorban
+    const salesTotalCol   = getTotalColumn(salesSheet, 5, 3);
+    const ordersTotalCol  = getTotalColumn(ordersSheet, 3, 2);
+    const wgrGmvCol       = getTotalColumn(wgrSheet, 4, 3);
+    const wgrProfitCol    = getProfitColumn(wgrSheet);
 
     // ==================== SZÍNEK ====================
     const darkBlue = "#4a86e8";
@@ -127,15 +127,14 @@ function GeneralGmvTablazat() {
 
     const wgrData = [];
     for (var i = 0; i < 11; i++) {
-        var r = startRow3 + 2 + i;   // a fő sheet sor száma (3-tól kezdődik)
-
+        var r = startRow3 + 2 + i;
         var germanName = wgrSheet.getRange("B" + (5 + i)).getValue().toString().trim();
         var englishName = germanName ? LanguageApp.translate(germanName, 'de', 'en') : germanName;
 
         wgrData.push([
             englishName,
             `='WGR'!${wgrGmvCol}${(5 + i)}`,
-            `=IFERROR(IF(L${r}=0; 0; N${r} / L${r}); 0)`,     // ← Margin most a saját L és N oszlopból
+            `=IFERROR(IF(L${r}=0; 0; N${r} / L${r}); 0)`,
             `='WGR'!${wgrProfitCol}${(5 + i)}`
         ]);
     }
@@ -219,17 +218,116 @@ function GeneralGmvTablazat() {
         sheet.setRowHeight(r, 28);
     }
 
+    // ==================== CHARTDATA + DIAGRAM ====================
+    updateChartData();
+
     SpreadsheetApp.flush();
 }
+// ====================== CHARTDATA ÉS DIAGRAM ======================
+function updateChartData() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var salesSheet = ss.getSheetByName("Sales");
+    var chartSheet = ss.getSheetByName("ChartData");
+    
+    if (!chartSheet) {
+        chartSheet = ss.insertSheet("ChartData");
+    }
+    
+    chartSheet.clear();
+
+    // Dinamikus hónapok keresése (Total előtt)
+    const headerRow = 5;
+    let col = 3; 
+    let monthColumns = [];
+
+    while (true) {
+        const header = salesSheet.getRange(headerRow, col).getValue().toString().trim();
+        if (header === "Total" || header === "" || col > 100) break;
+        if (header !== "") {
+            monthColumns.push({col: col, name: header});
+        }
+        col++;
+    }
+
+    // === ADATOK ÁTMÁSOLÁSA A CHART SHEETBE ===
+    const dataStartRow = 6;
+    const numRows = 25;
+
+    // 1. oszlop: Üzletnevek (Store names)
+    for (let i = 0; i < numRows; i++) {
+        const row = dataStartRow + i;
+        const storeName = salesSheet.getRange(row, 2).getValue(); // feltételezve, hogy a store név a B oszlopban van
+        chartSheet.getRange(i + 2, 1).setValue(storeName);
+    }
+
+    // Fejléc: első cella üres, utána a hónapok
+    chartSheet.getRange(1, 1).setValue("Store");
+    for (let i = 0; i < monthColumns.length; i++) {
+        chartSheet.getRange(1, i + 2).setValue(monthColumns[i].name);
+    }
+
+    // Adatok: hónapok szerinti értékek
+    for (let i = 0; i < numRows; i++) {
+        const row = dataStartRow + i;
+        for (let j = 0; j < monthColumns.length; j++) {
+            const letter = columnToLetter(monthColumns[j].col);
+            chartSheet.getRange(i + 2, j + 2).setFormula(`='Sales'!${letter}${row}`);
+        }
+    }
+
+    // Diagram létrehozása (beépített legendával)
+    createColumnChart(chartSheet, monthColumns.length);
+}
+
+function createColumnChart(chartSheet, numMonths) {
+    var existing = chartSheet.getCharts();
+    if (existing.length > 0) chartSheet.removeChart(existing[0]);
+
+    // Adatok tartománya: Store + hónapok (1. sor fejléc)
+    var range = chartSheet.getRange(1, 1, 26, numMonths + 1);
+
+    var chart = chartSheet.newChart()
+        .setChartType(Charts.ChartType.COLUMN)
+        .addRange(range)
+        .setPosition(2, 1, 0, 0)           // feljebb, nincs külön legendánk
+        .setOption('title', 'Turnover Sales by Store')
+        .setOption('hAxis.title', 'Stores')
+        .setOption('vAxis.title', 'Amount')
+        .setOption('legend', {position: 'top'})           // ← fontos: beépített legend
+        .setOption('height', 550)
+        .setOption('width', 1050)
+        .setOption('isStacked', false)                    // grouped (mint a képen)
+        .setOption('series', getSeriesColors(numMonths))  // színek beállítása
+        .build();
+
+    chartSheet.insertChart(chart);
+}
+
+// Színek a hónapokhoz (a te képed alapján)
+function getSeriesColors(numMonths) {
+    const colors = [
+        "#ff6384",  // JAN - rózsaszín/piros
+        "#e74c3c",  // FEB - sötétebb piros
+        "#ffce56",  // MARCH - sárga
+        "#f1c40f",  // APRIL - világosabb sárga
+        "#2ecc71",  // MAY - zöld
+        "#3498db"   // tartalék
+    ];
+
+    let series = {};
+    for (let i = 0; i < numMonths; i++) {
+        series[i] = {color: colors[i % colors.length]};
+    }
+    return series;
+}
+
 
 // ==================== SEGÉDFÜGGVÉNYEK ====================
 function getTotalColumn(sheet, startRow, startCol) {
     let col = startCol;
     while (true) {
         const value = sheet.getRange(startRow, col).getValue().toString().trim();
-        if (value === "Total") {
-            break;
-        }
+        if (value === "Total") break;
         col++;
         if (col > 200) break;
     }
