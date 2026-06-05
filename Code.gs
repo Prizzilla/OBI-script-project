@@ -2,14 +2,23 @@ function GeneralGmvTablazat() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getActiveSheet();
     var ordersSheet = ss.getSheetByName("Orders Coupon Nr");
+    var wgrSheet = ss.getSheetByName("WGR");
     
     if (!ordersSheet) {
         SpreadsheetApp.getUi().alert('Hiba: Nem található "Orders Coupon Nr" nevű munkalap!');
         return;
     }
+    if (!wgrSheet) {
+        SpreadsheetApp.getUi().alert('Hiba: Nem található "WGR" nevű munkalap!');
+        return;
+    }
 
     sheet.clear();
     sheet.clearFormats();
+
+    // ==================== SZÍNEK ====================
+    const darkBlue = "#4a86e8";
+    const lightBlue = "#8fb4ff";
 
     // ==================== NÉV LEKÉPEZÉS ====================
     const nameMap = {
@@ -52,7 +61,6 @@ function GeneralGmvTablazat() {
     sheet.getRange("C2").setValue("v. PY");
     sheet.getRange("D2").setValue("v. PL");
 
-    // Első tábla adatai (tömegesen)
     const firstTableData = [];
     for (var i = 3; i <= 12; i++) {
         firstTableData.push([
@@ -69,68 +77,111 @@ function GeneralGmvTablazat() {
     sheet.getRange("C13").setFormula("0");
     sheet.getRange("D13").setFormula("=AVERAGE(D3:D12)");
 
-    // ==================== MÁSODIK TÁBLA (TOP 20 DS) - TÖMEGESEN ====================
-    const startCol = 6;  // F
-    const startRow = 2;
+    // ==================== MÁSODIK TÁBLA (TOP 20 DS) ====================
+    const startCol2 = 6;
+    const startRow2 = 2;
 
-    sheet.getRange(startRow, startCol, 1, 4).merge().setValue("TOP 20 DS");
+    sheet.getRange(startRow2, startCol2, 1, 4).merge().setValue("TOP 20 DS");
+    sheet.getRange(startRow2 + 1, startCol2, 1, 4).setValues([["TOP 20 DS", "GMV", "v. PL", "Quota"]]);
 
-    sheet.getRange(startRow + 1, startCol, 1, 4).setValues([["TOP 20 DS", "GMV", "v. PL", "Quota"]]);
-
-    // TOP 20 DS adatok tömbként
     const top20Data = [];
     for (var i = 0; i < 20; i++) {
         var id = ordersSheet.getRange(5 + i, 1).getValue();
         var displayName = nameMap[id] || id;
+        top20Data.push([displayName, `='Orders Coupon Nr'!G${5 + i}`, 0, 0]);
+    }
+    sheet.getRange(startRow2 + 2, startCol2, 20, 4).setValues(top20Data);
 
-        top20Data.push([
-            displayName,
-            `='Orders Coupon Nr'!G${5 + i}`,
-            0,
-            0
+    const totalRow2 = startRow2 + 22;
+    sheet.getRange(totalRow2, startCol2).setValue("Total");
+    sheet.getRange(totalRow2, startCol2 + 1).setFormula("=SUM(G4:G23)");
+    sheet.getRange(totalRow2, startCol2 + 2).setValue(0);
+    sheet.getRange(totalRow2, startCol2 + 3).setValue(0);
+
+        // ==================== HARMADIK TÁBLA (WGR) - K1-től ====================
+    const startCol3 = 11; // K
+    const startRow3 = 1;
+
+    // Cím sor
+    sheet.getRange(startRow3, startCol3, 1, 2).merge().setValue("CAT49");
+    sheet.getRange(startRow3, startCol3 + 2, 1, 2).merge().setValue("GMV / PY/PL%");
+
+    // Fejléc
+    sheet.getRange(startRow3 + 1, startCol3).setValue("WGR");
+    sheet.getRange(startRow3 + 1, startCol3 + 1).setValue("GMV");
+    sheet.getRange(startRow3 + 1, startCol3 + 2).setValue("Margin");
+    sheet.getRange(startRow3 + 1, startCol3 + 3).setValue("Profit");
+
+    // Adatok + FORDÍTÁS
+    const wgrData = [];
+    for (var i = 0; i < 11; i++) {
+        var r = 5 + i;
+        
+        var germanName = wgrSheet.getRange("B" + r).getValue().toString().trim();
+        var englishName = germanName ? LanguageApp.translate(germanName, 'de', 'en') : germanName;
+
+        wgrData.push([
+            englishName,                           // ← Fordított név
+            `='WGR'!H${r}`,
+            `=IFERROR(IF('WGR'!H${r}=0; 0; 'WGR'!T${r} / 'WGR'!H${r}); 0)`,
+            `='WGR'!T${r}`
         ]);
     }
+    sheet.getRange(startRow3 + 2, startCol3, 11, 4).setValues(wgrData);   // setValues mert már nem formula a név
 
-    // Egyetlen művelettel írjuk ki az egész táblát
-    sheet.getRange(startRow + 2, startCol, 20, 4).setValues(top20Data);
-
-    // Összesítő
-    const totalRow = startRow + 22;
-    sheet.getRange(totalRow, startCol).setValue("Total");
-    sheet.getRange(totalRow, startCol + 1).setFormula("=SUM(G4:G23)");
-    sheet.getRange(totalRow, startCol + 2).setValue(0);
-    sheet.getRange(totalRow, startCol + 3).setValue(0);
-
+    // Total sor (marad ugyanaz)
+    const totalRow3 = startRow3 + 13;
+    sheet.getRange(totalRow3, startCol3).setValue("Total");
+    sheet.getRange(totalRow3, startCol3 + 1).setFormula("=SUM(L3:L13)");
+    sheet.getRange(totalRow3, startCol3 + 2).setFormula("=IFERROR(IF(L14=0;0; N14 / L14); 0)");
+    sheet.getRange(totalRow3, startCol3 + 3).setFormula("=SUM(N3:N13)");
     // ==================== FORMÁZÁSOK ====================
-    sheet.getRange("A1:I" + totalRow)
+    const maxRow = Math.max(totalRow2, totalRow3);
+
+    sheet.getRange("A1:N" + maxRow)
         .setFontFamily("Arial")
         .setBorder(true, true, true, true, true, true, "#d9d9d9", SpreadsheetApp.BorderStyle.SOLID);
 
     // Fejlécek
     sheet.getRange("A1:D1").setFontWeight("bold").setHorizontalAlignment("center").setBackground("#ffffff");
-    sheet.getRange("A2:D2").setFontWeight("bold").setHorizontalAlignment("center").setVerticalAlignment("middle")
-          .setBackground("#4a86e8").setFontColor("#ffffff");   // A2 kék, de B2-D2 világosabb
+    sheet.getRange("A2:D2").setFontWeight("bold").setHorizontalAlignment("center").setVerticalAlignment("middle");
+    sheet.getRange("A2").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("B2:D2").setBackground(lightBlue).setFontColor("#000000");
 
-    sheet.getRange("B2:D2").setBackground("#8fb4ff").setFontColor("#000000");
+    sheet.getRange("F2:I2").setFontWeight("bold").setHorizontalAlignment("center").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("F3:I3").setFontWeight("bold").setHorizontalAlignment("center").setBackground(lightBlue).setFontColor("#000000");
 
-    sheet.getRange("F2:I2").setFontWeight("bold").setHorizontalAlignment("center").setBackground("#4a86e8").setFontColor("#ffffff");
-    sheet.getRange("F3:I3").setFontWeight("bold").setHorizontalAlignment("center").setBackground("#8fb4ff").setFontColor("#000000");
+    sheet.getRange("K1:L1").setFontWeight("bold").setHorizontalAlignment("center").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("M1:N1").setFontWeight("bold").setHorizontalAlignment("center").setBackground("#ffffff").setFontColor("#000000");
+
+    sheet.getRange("K2:N2").setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("K2").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("L2:N2").setBackground(lightBlue).setFontColor("#000000");
 
     // Adatsorok
-    sheet.getRange("A3:A12").setBackground("#8fb4ff").setFontWeight("bold").setHorizontalAlignment("center");
-    sheet.getRange("F4:F23").setBackground("#8fb4ff").setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("A3:A12").setBackground(lightBlue).setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("F4:F23").setBackground(lightBlue).setFontWeight("bold").setHorizontalAlignment("center");
+    
+    // WGR nevek - még kisebb betűméret
+    sheet.getRange("K3:K13")
+        .setBackground(lightBlue)
+        .setFontWeight("bold")
+        .setHorizontalAlignment("center")
+        .setFontSize(9);
 
     sheet.getRange("B3:D12").setBackground("#efefef");
     sheet.getRange("G4:I23").setBackground("#efefef");
+    sheet.getRange("L3:N13").setBackground("#efefef");
 
-    sheet.getRange("A13:D13").setBackground("#8fb4ff").setFontWeight("bold");
-    sheet.getRange("F24:I24").setBackground("#8fb4ff").setFontWeight("bold");
+    // Total sorok - javított színezés
+    sheet.getRange("A13:D13").setBackground(lightBlue).setFontWeight("bold");
+    sheet.getRange("F24:I24").setBackground(lightBlue).setFontWeight("bold");
+    sheet.getRange("K14:N14").setBackground(lightBlue).setFontWeight("bold");
 
-    // Formátumok
-    sheet.getRange("B3:B13").setNumberFormat("#,##0");
-    sheet.getRange("G4:G23").setNumberFormat("#,##0");
-    sheet.getRange("C3:D13").setNumberFormat("0.00%");
-    sheet.getRange("H4:I24").setNumberFormat("0");
+    // Számformátumok
+    
+    sheet.getRange("C3:D13").setNumberFormat("0.00%").setHorizontalAlignment("right");
+    sheet.getRange("M3:M14").setNumberFormat("0.0%").setHorizontalAlignment("right");
 
     // Oszlopszélességek
     sheet.setColumnWidth(1, 140);
@@ -141,13 +192,14 @@ function GeneralGmvTablazat() {
     sheet.setColumnWidth(7, 95);
     sheet.setColumnWidth(8, 70);
     sheet.setColumnWidth(9, 80);
+    sheet.setColumnWidth(11, 180);
+    sheet.setColumnWidth(12, 95);
+    sheet.setColumnWidth(13, 80);
+    sheet.setColumnWidth(14, 95);
 
-    // Sor magasság
-    for (var r = 1; r <= totalRow; r++) {
+    for (var r = 1; r <= maxRow; r++) {
         sheet.setRowHeight(r, 28);
     }
-
-
 
     SpreadsheetApp.flush();
 }
