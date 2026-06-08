@@ -27,6 +27,30 @@ function GeneralGmvTablazat() {
     const wgrGmvCol       = getTotalColumn(wgrSheet, 4, 3);
     const wgrProfitCol    = getProfitColumn(wgrSheet);
 
+    // ==================== ELŐZŐ HÓNAP DINAMIKUS OSZLOPOK ====================
+    const previousMonth = getPreviousMonthInfo();
+    const hasPreviousMonth = previousMonth.month > 0;
+
+    const salesPrevMonthCol = hasPreviousMonth
+        ? getMonthColumnByHeader(salesSheet, 5, 3, previousMonth.yyyymm, false)
+        : null;
+
+    const ordersPrevMonthCol = hasPreviousMonth
+        ? getMonthColumnByHeader(ordersSheet, 3, 2, previousMonth.yyyymm, false)
+        : null;
+
+    const wgrPrevGmvCol = hasPreviousMonth
+        ? getMonthColumnByHeader(wgrSheet, 4, 3, previousMonth.yyyymm, false)
+        : null;
+
+    const wgrPrevProfitCol = hasPreviousMonth
+        ? getMonthColumnByHeader(wgrSheet, 4, 3, previousMonth.yyyymm, true)
+        : null;
+
+    const planPrevMonthCol = hasPreviousMonth
+        ? columnToLetter(previousMonth.month + 1)
+        : null;
+
     // ==================== SZÍNEK ====================
     const darkBlue = "#4a86e8";
     const lightBlue = "#8fb4ff";
@@ -147,8 +171,107 @@ function GeneralGmvTablazat() {
     sheet.getRange(totalRow3, startCol3 + 2).setFormula("=IFERROR(IF(L14=0;0; N14 / L14); 0)");
     sheet.getRange(totalRow3, startCol3 + 3).setFormula("=SUM(N3:N13)");
 
+    // ==================== PLUSZ ELSŐ TÁBLA - ELŐZŐ HÓNAP (GMV STORES) ====================
+    const prevStartRow1 = 30;
+
+    sheet.getRange(prevStartRow1, 1, 1, 2).merge().setValue("GMV STORES");
+    sheet.getRange(prevStartRow1, 3, 1, 2).merge().setValue("GMV / PY/PL%");
+
+    sheet.getRange(prevStartRow1 + 1, 1).setValue("TOP Stores");
+    sheet.getRange(prevStartRow1 + 1, 2).setValue("GMV");
+    sheet.getRange(prevStartRow1 + 1, 3).setValue("v. PY");
+    sheet.getRange(prevStartRow1 + 1, 4).setValue("v. PL");
+
+    const prevFirstTableData = [];
+    for (var i = 0; i < 10; i++) {
+        var targetRow = prevStartRow1 + 2 + i;
+        var planRow = 3 + i;
+        var salesRow = 6 + i;
+
+        prevFirstTableData.push([
+            `= "T " & ${i + 1} & " - " & MID('Plan 2026'!A${planRow}; 4; 3)`,
+            hasPreviousMonth && salesPrevMonthCol ? `=Sales!${salesPrevMonthCol}${salesRow}` : "0",
+            "0",
+            hasPreviousMonth && planPrevMonthCol
+                ? `=IFERROR(B${targetRow} / 'Plan 2026'!${planPrevMonthCol}${planRow} - 1; 0)`
+                : "0"
+        ]);
+    }
+
+    sheet.getRange(prevStartRow1 + 2, 1, 10, 4).setFormulas(prevFirstTableData);
+
+    const prevTotalRow1 = prevStartRow1 + 12;
+    sheet.getRange(prevTotalRow1, 1).setValue("Total");
+    sheet.getRange(prevTotalRow1, 2).setFormula(`=SUM(B${prevStartRow1 + 2}:B${prevStartRow1 + 11})`);
+    sheet.getRange(prevTotalRow1, 3).setFormula("0");
+    sheet.getRange(prevTotalRow1, 4).setFormula(`=AVERAGE(D${prevStartRow1 + 2}:D${prevStartRow1 + 11})`);
+
+    // ==================== PLUSZ MÁSODIK TÁBLA - ELŐZŐ HÓNAP (TOP 20 DS) ====================
+    const prevStartCol2 = 6;
+    const prevStartRow2 = 30;
+
+    sheet.getRange(prevStartRow2, prevStartCol2, 1, 2).merge().setValue("GMV Designers");
+    sheet.getRange(prevStartRow2, prevStartCol2 + 2, 1, 2).merge().setValue("GMV / PY/PL%");
+
+    sheet.getRange(prevStartRow2 + 1, prevStartCol2, 1, 4).setValues([["TOP 20 DS", "GMV", "v. PL", "Quota"]]);
+
+    const prevTop20Data = [];
+    for (var i = 0; i < 20; i++) {
+        var id = ordersSheet.getRange(5 + i, 1).getValue();
+        var displayName = nameMap[id] || id;
+
+        prevTop20Data.push([
+            displayName,
+            hasPreviousMonth && ordersPrevMonthCol ? `='Orders Coupon Nr'!${ordersPrevMonthCol}${5 + i}` : "0",
+            0,
+            0
+        ]);
+    }
+
+    sheet.getRange(prevStartRow2 + 2, prevStartCol2, 20, 4).setValues(prevTop20Data);
+
+    const prevTotalRow2 = prevStartRow2 + 22;
+    sheet.getRange(prevTotalRow2, prevStartCol2).setValue("Total");
+    sheet.getRange(prevTotalRow2, prevStartCol2 + 1).setFormula(`=SUM(G${prevStartRow2 + 2}:G${prevStartRow2 + 21})`);
+    sheet.getRange(prevTotalRow2, prevStartCol2 + 2).setValue(0);
+    sheet.getRange(prevTotalRow2, prevStartCol2 + 3).setValue(0);
+
+    // ==================== PLUSZ HARMADIK TÁBLA - ELŐZŐ HÓNAP (WGR) ====================
+    const prevStartCol3 = 11;
+    const prevStartRow3 = 30;
+
+    sheet.getRange(prevStartRow3, prevStartCol3, 1, 2).merge().setValue("CAT49");
+    sheet.getRange(prevStartRow3, prevStartCol3 + 2, 1, 2).merge().setValue("GMV / PY/PL%");
+
+    sheet.getRange(prevStartRow3 + 1, prevStartCol3).setValue("WGR");
+    sheet.getRange(prevStartRow3 + 1, prevStartCol3 + 1).setValue("GMV");
+    sheet.getRange(prevStartRow3 + 1, prevStartCol3 + 2).setValue("Margin");
+    sheet.getRange(prevStartRow3 + 1, prevStartCol3 + 3).setValue("Profit");
+
+    const prevWgrData = [];
+    for (var i = 0; i < 11; i++) {
+        var r = prevStartRow3 + 2 + i;
+        var germanName = wgrSheet.getRange("B" + (5 + i)).getValue().toString().trim();
+        var englishName = germanName ? LanguageApp.translate(germanName, 'de', 'en') : germanName;
+
+        prevWgrData.push([
+            englishName,
+            hasPreviousMonth && wgrPrevGmvCol ? `='WGR'!${wgrPrevGmvCol}${5 + i}` : "0",
+            `=IFERROR(IF(L${r}=0; 0; N${r} / L${r}); 0)`,
+            hasPreviousMonth && wgrPrevProfitCol ? `='WGR'!${wgrPrevProfitCol}${5 + i}` : "0"
+        ]);
+    }
+
+    sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(prevWgrData);
+
+    const prevTotalRow3 = prevStartRow3 + 13;
+    sheet.getRange(prevTotalRow3, prevStartCol3).setValue("Total");
+    sheet.getRange(prevTotalRow3, prevStartCol3 + 1).setFormula(`=SUM(L${prevStartRow3 + 2}:L${prevStartRow3 + 12})`);
+    sheet.getRange(prevTotalRow3, prevStartCol3 + 2).setFormula(`=IFERROR(IF(L${prevTotalRow3}=0;0; N${prevTotalRow3} / L${prevTotalRow3}); 0)`);
+    sheet.getRange(prevTotalRow3, prevStartCol3 + 3).setFormula(`=SUM(N${prevStartRow3 + 2}:N${prevStartRow3 + 12})`);
+
     // ==================== FORMÁZÁSOK ====================
-    const maxRow = Math.max(totalRow2, totalRow3);
+    const maxRow = Math.max(totalRow2, totalRow3, prevTotalRow1, prevTotalRow2, prevTotalRow3);
 
     sheet.getRange("A1:N" + maxRow)
         .setFontFamily("Arial")
@@ -194,6 +317,52 @@ function GeneralGmvTablazat() {
     sheet.getRange("K" + totalRow3).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
     sheet.getRange("L" + totalRow3 + ":N" + totalRow3).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
 
+    // ==================== ELŐZŐ HÓNAP TÁBLÁK FORMÁZÁSA ====================
+    sheet.getRange("A30:D30").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
+    sheet.getRange("F30:I30").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
+    sheet.getRange("K30:N30").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
+
+    sheet.getRange("A30:B30").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("C30:D30").setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+
+    sheet.getRange("A31:D31").setFontWeight("bold").setHorizontalAlignment("center").setVerticalAlignment("middle");
+    sheet.getRange("A31").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("B31:D31").setBackground(lightBlue).setFontColor("#000000");
+
+    sheet.getRange("A32:A41").setBackground(lightBlue).setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("B32:B41").setBackground("#ffffff");
+    sheet.getRange("C32:D41").setBackground("#efefef");
+
+    sheet.getRange("A" + prevTotalRow1).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
+    sheet.getRange("B" + prevTotalRow1 + ":D" + prevTotalRow1).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+
+    sheet.getRange("F30:G30").setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
+    sheet.getRange("H30:I30").setBackground("#ffffff").setFontColor("#000000").setFontWeight("bold");
+
+    sheet.getRange("F31").setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("G31:I31").setFontWeight("bold").setHorizontalAlignment("center").setBackground(lightBlue).setFontColor("#000000");
+
+    sheet.getRange("F32:F51").setBackground(lightBlue).setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("G32:G51").setBackground("#ffffff");
+    sheet.getRange("H32:I51").setBackground("#efefef");
+
+    sheet.getRange("F" + prevTotalRow2).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
+    sheet.getRange("G" + prevTotalRow2 + ":I" + prevTotalRow2).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+
+    sheet.getRange("K30:L30").setBackground(darkBlue).setFontColor("#ffffff");
+    sheet.getRange("M30:N30").setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+
+    sheet.getRange("K31").setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+    sheet.getRange("L31:N31").setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold").setHorizontalAlignment("center");
+
+    sheet.getRange("K32:K42").setBackground(lightBlue).setFontWeight("bold").setHorizontalAlignment("center").setFontSize(9);
+    sheet.getRange("L32:L42").setBackground("#ffffff");
+    sheet.getRange("N32:N42").setBackground("#ffffff");
+    sheet.getRange("M32:M42").setBackground("#efefef");
+
+    sheet.getRange("K" + prevTotalRow3).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
+    sheet.getRange("L" + prevTotalRow3 + ":N" + prevTotalRow3).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+
     sheet.getRange("B3:B13").setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("G4:G23").setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("L3:L" + totalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
@@ -201,6 +370,14 @@ function GeneralGmvTablazat() {
 
     sheet.getRange("C3:D13").setNumberFormat("0.00%").setHorizontalAlignment("right");
     sheet.getRange("M3:M" + totalRow3).setNumberFormat("0.0%").setHorizontalAlignment("right");
+
+    sheet.getRange("B32:B" + prevTotalRow1).setNumberFormat("#,##0").setHorizontalAlignment("right");
+    sheet.getRange("G32:G" + prevTotalRow2).setNumberFormat("#,##0").setHorizontalAlignment("right");
+    sheet.getRange("L32:L" + prevTotalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
+    sheet.getRange("N32:N" + prevTotalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
+
+    sheet.getRange("C32:D" + prevTotalRow1).setNumberFormat("0.00%").setHorizontalAlignment("right");
+    sheet.getRange("M32:M" + prevTotalRow3).setNumberFormat("0.0%").setHorizontalAlignment("right");
 
     sheet.setColumnWidth(1, 140);
     sheet.setColumnWidth(2, 95);
@@ -357,29 +534,82 @@ function createHUMonthlyChart() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var dataSheet = ss.getSheetByName("HU monthly summary 2026");
     var chartSheet = ss.getSheetByName("ChartData");
-    
+
     if (!dataSheet) {
         SpreadsheetApp.getUi().alert('Hiba: Nem található "HU monthly summary 2026" nevű munkalap!');
         return;
     }
-    
+
     if (!chartSheet) {
         chartSheet = ss.insertSheet("ChartData");
     }
 
-    // Adatok tartománya - Table2
-    var dataRange = dataSheet.getRange("A17:C26");
+    var currentMonth = new Date().getMonth() + 1;
+    var numStores = 10;
+
+    var helperStartRow = 1;
+    var helperStartCol = 12; // L oszlop
+
+    chartSheet
+        .getRange(helperStartRow, helperStartCol, numStores + 1, 5)
+        .clearContent();
+
+    chartSheet
+        .getRange(helperStartRow, helperStartCol, 1, 5)
+        .setValues([
+            ["Store", "OFFERS", "OFFERS label", "ORDERS", "ORDERS label"]
+        ]);
+
+    var chartData = [];
+
+    for (var i = 0; i < numStores; i++) {
+        var storeName = dataSheet.getRange(3 + i, 1).getValue();
+
+        var offersValues = dataSheet
+            .getRange(3 + i, 2, 1, currentMonth)
+            .getValues()[0];
+
+        var ordersValues = dataSheet
+            .getRange(17 + i, 2, 1, currentMonth)
+            .getValues()[0];
+
+        var offersSum = offersValues.reduce(function(sum, value) {
+            return sum + (Number(value) || 0);
+        }, 0);
+
+        var ordersSum = ordersValues.reduce(function(sum, value) {
+            return sum + (Number(value) || 0);
+        }, 0);
+
+        chartData.push([
+            storeName,
+            offersSum,
+            formatEuroLabel(offersSum),
+            ordersSum,
+            formatEuroLabel(ordersSum)
+        ]);
+    }
+
+    chartSheet
+        .getRange(helperStartRow + 1, helperStartCol, chartData.length, 5)
+        .setValues(chartData);
+
+    var dataRange = chartSheet.getRange(
+        helperStartRow,
+        helperStartCol,
+        numStores + 1,
+        5
+    );
 
     var chart = chartSheet.newChart()
         .setChartType(Charts.ChartType.COLUMN)
         .addRange(dataRange)
+        .setNumHeaders(1)
 
-        // 📌 L1-től indul
-        .setPosition(1, 12, 0, 0) // L = 12. oszlop
+        .setPosition(13, 12, 0, 0)
 
         .setOption('title', 'Offers vs Orders by Store')
 
-        // 🔵 háttér sötétkék
         .setOption('backgroundColor', '#0B5394')
         .setOption('chartArea', {
             backgroundColor: '#0B5394',
@@ -387,7 +617,6 @@ function createHUMonthlyChart() {
             top: 80
         })
 
-        // 📊 axis
         .setOption('hAxis', {
             title: 'Stores',
             textStyle: { color: '#ffffff', fontSize: 11 },
@@ -406,7 +635,6 @@ function createHUMonthlyChart() {
             viewWindow: { min: 0 }
         })
 
-        // 📌 legend
         .setOption('legend', {
             position: 'top',
             alignment: 'center',
@@ -416,25 +644,40 @@ function createHUMonthlyChart() {
             }
         })
 
-        // 📊 3D
+        .setOption('annotations', {
+    alwaysOutside: true,
+    stem: { color: 'none' },
+    textStyle: {
+        color: '#fff2cc',
+        fontSize: 12,
+        bold: true
+    }
+})
+.setOption('displayAnnotations', true)
+
         .setOption('is3D', true)
 
-        // 📌 sorozatok
         .setOption('series', {
-            0: { color: '#f8f1e9', label: 'OFFERS' },
-            1: { color: '#ff7f0e', label: 'ORDERS' }
+            0: { color: '#fff2cc' }, // OFFERS - tojásos fehér
+            1: { color: '#e25f00' }  // ORDERS - narancssárga
         })
 
         .setOption('height', 520)
         .setOption('width', 1050)
         .setOption('isStacked', false)
+        .setOption('useFirstColumnAsDomain', true)
 
         .build();
 
     chartSheet.insertChart(chart);
 }
 
-
+// Euro formázás az oszlopok tetejére
+function formatEuroLabel(value) {
+    return Math.round(value)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, " ") + "€";
+}
 function createColumnChart(chartSheet, numMonths) {
 
     const existingCharts =
@@ -584,6 +827,56 @@ function getProfitColumn(sheet) {
         }
     }
     return columnToLetter(col);
+}
+
+function getPreviousMonthInfo() {
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+
+    if (currentMonth === 1) {
+        return {
+            month: 0,
+            yyyymm: null
+        };
+    }
+
+    const previousMonth = currentMonth - 1;
+    const year = today.getFullYear();
+    const monthText = previousMonth < 10 ? "0" + previousMonth : "" + previousMonth;
+
+    return {
+        month: previousMonth,
+        yyyymm: "" + year + monthText
+    };
+}
+
+function getMonthColumnByHeader(sheet, headerRow, startCol, yyyymm, useLastMatch) {
+    let foundCol = null;
+    let col = startCol;
+
+    while (col <= 200) {
+        const value = sheet.getRange(headerRow, col).getValue().toString().trim();
+
+        if (value === "" && foundCol !== null) {
+            break;
+        }
+
+        if (value === "Total" && foundCol !== null && !useLastMatch) {
+            break;
+        }
+
+        if (value === yyyymm) {
+            foundCol = col;
+
+            if (!useLastMatch) {
+                break;
+            }
+        }
+
+        col++;
+    }
+
+    return foundCol ? columnToLetter(foundCol) : null;
 }
 
 function columnToLetter(column) {
