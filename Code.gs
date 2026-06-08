@@ -61,8 +61,9 @@ function GeneralGmvTablazat() {
         "2090953701602": "Tünde K.",
         "2090953701947": "Tünde W-H.",
         "2090953701879": "Zsanett Sz.",
-        "2090951500481": "Tarjányi Krisztina",
+        "2090951500481": "Semsei Imre",
         "2090952400919":"Sólyom Balázs"
+        
     };
 
     // ==================== ELSŐ TÁBLA (GMV STORES) ====================
@@ -219,109 +220,343 @@ function GeneralGmvTablazat() {
     }
 
     // ==================== CHARTDATA + DIAGRAM ====================
-    updateChartData();
+       
+    updateChartData();        // a régi diagram
+    createHUMonthlyChart();   // ← az új diagram
 
     SpreadsheetApp.flush();
 }
 // ====================== CHARTDATA ÉS DIAGRAM ======================
+
 function updateChartData() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var salesSheet = ss.getSheetByName("Sales");
     var chartSheet = ss.getSheetByName("ChartData");
+
+    if (!chartSheet) {
+        chartSheet = ss.insertSheet("ChartData");
+    }
+
+    chartSheet.clear();
+
+    // Dinamikus hónapok keresése
+    const headerRow = 5;
+    let col = 3;
+    let monthColumns = [];
+
+    while (true) {
+        const header = salesSheet
+            .getRange(headerRow, col)
+            .getValue()
+            .toString()
+            .trim();
+
+        if (header === "Total" || header === "" || col > 100) {
+            break;
+        }
+
+        monthColumns.push({
+            col: col,
+            name: header
+        });
+
+        col++;
+    }
+
+    // ==========================================
+    // STORE NEVEK
+    // ==========================================
+    const dataStartRow = 6;
+    const numRows =23;
+
+    for (let i = 0; i < numRows; i++) {
+        const row = dataStartRow + i;
+
+        chartSheet
+            .getRange(i + 2, 1)
+            .setValue(
+                salesSheet.getRange(row, 2).getValue()
+            );
+    }
+
+    // ==========================================
+    // HÓNAP ADATOK
+    // ==========================================
+    for (let i = 0; i < numRows; i++) {
+
+        const row = dataStartRow + i;
+
+        for (let j = 0; j < monthColumns.length; j++) {
+
+            const letter = columnToLetter(
+                monthColumns[j].col
+            );
+
+            chartSheet
+                .getRange(i + 2, j + 2)
+                .setFormula(
+                    `='Sales'!${letter}${row}`
+                );
+        }
+    }
+
+    createColumnChart(chartSheet, monthColumns.length);
+}
+
+// =====================================================
+// FIX HÓNAPOK
+// =====================================================
+function getFixedMonths() {
+    return [
+        { name: "Január",     color: "#ff9aa2" },   // puha rózsaszín
+        { name: "Február",    color: "#ff8c8c" },   // puha piros
+        { name: "Március",    color: "#ffe38c" },   // puha sárga
+        { name: "Április",    color: "#fff3a3" },   // világos sárga
+        { name: "Május",      color: "#a3e4a3" },   // puha zöld
+        { name: "Június",     color: "#9cd4ff" },   // puha kék
+        { name: "Július",     color: "#c9a3e0" },   // puha lila
+        { name: "Augusztus",  color: "#7ed6d1" },   // puha türkiz
+        { name: "Szeptember", color: "#ffbb7d" },   // puha narancs
+        { name: "Október",    color: "#8c9bb8" },   // szürke-kék
+        { name: "November",   color: "#7ed6a8" },   // puha zöldes
+        { name: "December",   color: "#ff9a9a" }    // puha piros
+    ];
+}
+
+// =====================================================
+// SERIES DEFINÍCIÓ
+// =====================================================
+
+function getSeriesWithLabels(numMonths) {
+
+    const months = getFixedMonths();
+
+    const series = {};
+
+    for (let i = 0; i < Math.min(numMonths, 12); i++) {
+
+        series[i] = {
+            color: months[i].color,
+
+            // Google Charts ezt használja,
+            // ha támogatott az adott chart típusnál
+            labelInLegend: months[i].name,
+
+            label: months[i].name
+        };
+    }
+
+    return series;
+}
+
+// =====================================================
+// DIAGRAM
+// =====================================================
+// ====================== HU MONTHLY SUMMARY DIAGRAM (Offers vs Orders) ======================
+function createHUMonthlyChart() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var dataSheet = ss.getSheetByName("HU monthly summary 2026");
+    var chartSheet = ss.getSheetByName("ChartData");
+    
+    if (!dataSheet) {
+        SpreadsheetApp.getUi().alert('Hiba: Nem található "HU monthly summary 2026" nevű munkalap!');
+        return;
+    }
     
     if (!chartSheet) {
         chartSheet = ss.insertSheet("ChartData");
     }
-    
-    chartSheet.clear();
 
-    // Dinamikus hónapok keresése (Total előtt)
-    const headerRow = 5;
-    let col = 3; 
-    let monthColumns = [];
-
-    while (true) {
-        const header = salesSheet.getRange(headerRow, col).getValue().toString().trim();
-        if (header === "Total" || header === "" || col > 100) break;
-        if (header !== "") {
-            monthColumns.push({col: col, name: header});
-        }
-        col++;
-    }
-
-    // === ADATOK ÁTMÁSOLÁSA A CHART SHEETBE ===
-    const dataStartRow = 6;
-    const numRows = 25;
-
-    // 1. oszlop: Üzletnevek (Store names)
-    for (let i = 0; i < numRows; i++) {
-        const row = dataStartRow + i;
-        const storeName = salesSheet.getRange(row, 2).getValue(); // feltételezve, hogy a store név a B oszlopban van
-        chartSheet.getRange(i + 2, 1).setValue(storeName);
-    }
-
-    // Fejléc: első cella üres, utána a hónapok
-    chartSheet.getRange(1, 1).setValue("Store");
-    for (let i = 0; i < monthColumns.length; i++) {
-        chartSheet.getRange(1, i + 2).setValue(monthColumns[i].name);
-    }
-
-    // Adatok: hónapok szerinti értékek
-    for (let i = 0; i < numRows; i++) {
-        const row = dataStartRow + i;
-        for (let j = 0; j < monthColumns.length; j++) {
-            const letter = columnToLetter(monthColumns[j].col);
-            chartSheet.getRange(i + 2, j + 2).setFormula(`='Sales'!${letter}${row}`);
-        }
-    }
-
-    // Diagram létrehozása (beépített legendával)
-    createColumnChart(chartSheet, monthColumns.length);
-}
-
-function createColumnChart(chartSheet, numMonths) {
-    var existing = chartSheet.getCharts();
-    if (existing.length > 0) chartSheet.removeChart(existing[0]);
-
-    // Adatok tartománya: Store + hónapok (1. sor fejléc)
-    var range = chartSheet.getRange(1, 1, 26, numMonths + 1);
+    // Adatok tartománya - Table2
+    var dataRange = dataSheet.getRange("A17:C26");
 
     var chart = chartSheet.newChart()
         .setChartType(Charts.ChartType.COLUMN)
-        .addRange(range)
-        .setPosition(2, 1, 0, 0)           // feljebb, nincs külön legendánk
-        .setOption('title', 'Turnover Sales by Store')
-        .setOption('hAxis.title', 'Stores')
-        .setOption('vAxis.title', 'Amount')
-        .setOption('legend', {position: 'top'})           // ← fontos: beépített legend
-        .setOption('height', 550)
+        .addRange(dataRange)
+
+        // 📌 L1-től indul
+        .setPosition(1, 12, 0, 0) // L = 12. oszlop
+
+        .setOption('title', 'Offers vs Orders by Store')
+
+        // 🔵 háttér sötétkék
+        .setOption('backgroundColor', '#0B5394')
+        .setOption('chartArea', {
+            backgroundColor: '#0B5394',
+            left: 80,
+            top: 80
+        })
+
+        // 📊 axis
+        .setOption('hAxis', {
+            title: 'Stores',
+            textStyle: { color: '#ffffff', fontSize: 11 },
+            titleTextStyle: { color: '#ffffff' },
+            slantedText: true,
+            slantedTextAngle: 45
+        })
+
+        .setOption('vAxis', {
+            title: 'Amount',
+            format: '#,##0€',
+            textStyle: { color: '#ffffff' },
+            titleTextStyle: { color: '#ffffff' },
+            gridlines: { color: '#2f6fb0' },
+            minorGridlines: { count: 2 },
+            viewWindow: { min: 0 }
+        })
+
+        // 📌 legend
+        .setOption('legend', {
+            position: 'top',
+            alignment: 'center',
+            textStyle: {
+                color: '#ffffff',
+                fontSize: 12
+            }
+        })
+
+        // 📊 3D
+        .setOption('is3D', true)
+
+        // 📌 sorozatok
+        .setOption('series', {
+            0: { color: '#f8f1e9', label: 'OFFERS' },
+            1: { color: '#ff7f0e', label: 'ORDERS' }
+        })
+
+        .setOption('height', 520)
         .setOption('width', 1050)
-        .setOption('isStacked', false)                    // grouped (mint a képen)
-        .setOption('series', getSeriesColors(numMonths))  // színek beállítása
+        .setOption('isStacked', false)
+
         .build();
 
     chartSheet.insertChart(chart);
 }
 
-// Színek a hónapokhoz (a te képed alapján)
-function getSeriesColors(numMonths) {
-    const colors = [
-        "#ff6384",  // JAN - rózsaszín/piros
-        "#e74c3c",  // FEB - sötétebb piros
-        "#ffce56",  // MARCH - sárga
-        "#f1c40f",  // APRIL - világosabb sárga
-        "#2ecc71",  // MAY - zöld
-        "#3498db"   // tartalék
-    ];
 
-    let series = {};
-    for (let i = 0; i < numMonths; i++) {
-        series[i] = {color: colors[i % colors.length]};
+function createColumnChart(chartSheet, numMonths) {
+
+    const existingCharts =
+        chartSheet.getCharts();
+
+    existingCharts.forEach(chart => {
+        chartSheet.removeChart(chart);
+    });
+
+    // 2. sortól indulunk
+    // nincs szükség fejlécre
+    const range = chartSheet.getRange(
+        2,
+        1,
+        23,
+        numMonths + 1
+    );
+
+    const chart = chartSheet
+        .newChart()
+        .setChartType(
+            Charts.ChartType.COLUMN
+        )
+        .addRange(range)
+
+        .setPosition(
+            2,
+            1,
+            0,
+            0
+        )
+
+        .setOption(
+            "title",
+            "Turnover Sales by Store"
+        )
+
+        .setOption('backgroundColor', '#0B5394')
+
+.setOption('chartArea', {
+    backgroundColor: '#0B5394'
+})
+
+.setOption('legend', {
+    position: 'top',
+    alignment: 'center',
+    textStyle: {
+        color: '#ffffff',
+        fontSize: 12
     }
-    return series;
+})
+
+.setOption('hAxis', {
+    title: 'Stores',
+    titleTextStyle: {
+        color: '#ffffff'
+    },
+    textStyle: {
+        color: '#ffffff'
+    }
+})
+
+.setOption('vAxis', {
+    title: 'Amount',
+    titleTextStyle: {
+        color: '#ffffff'
+    },
+    textStyle: {
+        color: '#ffffff'
+    },
+    gridlines: {
+        color: '#2f6fb0'
+    }
+})
+
+        .setOption("hAxis", {
+            title: "Stores"
+        })
+
+        .setOption("vAxis", {
+            title: "Amount"
+        })
+
+        .setOption("legend", {
+            position: "top",
+            alignment: "center",
+            textStyle: {
+                fontSize: 12
+            }
+        })
+
+        .setOption(
+            "height",
+            550
+        )
+
+        .setOption(
+            "width",
+            1050
+        )
+
+        .setOption(
+            "isStacked",
+            false
+        )
+
+        .setOption('is3D', true)
+
+        .setOption(
+            "series",
+            getSeriesWithLabels(numMonths)
+        )
+
+        .setOption(
+            "useFirstColumnAsDomain",
+            true
+        )
+
+        .build();
+
+    chartSheet.insertChart(chart);
 }
-
-
 // ==================== SEGÉDFÜGGVÉNYEK ====================
 function getTotalColumn(sheet, startRow, startCol) {
     let col = startCol;
