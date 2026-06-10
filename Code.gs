@@ -27,6 +27,7 @@ function GeneralGmvTablazat() {
     const wgrGmvCol       = getTotalColumn(wgrSheet, 4, 3);
     const wgrProfitCol    = getProfitColumn(wgrSheet);
 
+
     // ==================== ELŐZŐ HÓNAP DINAMIKUS OSZLOPOK ====================
     const previousMonth = getPreviousMonthInfo();
     const hasPreviousMonth = previousMonth.month > 0;
@@ -183,22 +184,40 @@ function GeneralGmvTablazat() {
     sheet.getRange(prevStartRow1 + 1, 4).setValue("v. PL");
 
     const prevFirstTableData = [];
-    for (var i = 0; i < 10; i++) {
-        var targetRow = prevStartRow1 + 2 + i;
-        var planRow = 3 + i;
-        var salesRow = 6 + i;
 
-        prevFirstTableData.push([
-            `= "T " & ${i + 1} & " - " & MID('Plan 2026'!A${planRow}; 4; 3)`,
-            hasPreviousMonth && salesPrevMonthCol ? `=Sales!${salesPrevMonthCol}${salesRow}` : "0",
-            "0",
-            hasPreviousMonth && planPrevMonthCol
-                ? `=IFERROR(B${targetRow} / 'Plan 2026'!${planPrevMonthCol}${planRow} - 1; 0)`
-                : "0"
-        ]);
-    }
+for (var i = 0; i < 10; i++) {
+    var planRow = 3 + i;
+    var salesRow = 6 + i;
 
-    sheet.getRange(prevStartRow1 + 2, 1, 10, 4).setFormulas(prevFirstTableData);
+    var gmvValue = hasPreviousMonth && salesPrevMonthCol
+        ? Number(salesSheet.getRange(salesRow, letterToColumn(salesPrevMonthCol)).getValue()) || 0
+        : 0;
+
+    prevFirstTableData.push({
+        gmv: gmvValue,
+        planRow: planRow,
+        salesRow: salesRow
+    });
+}
+
+prevFirstTableData.sort(function(a, b) {
+    return b.gmv - a.gmv;
+});
+
+var sortedPrevFirstRows = prevFirstTableData.map(function(item, index) {
+    var targetRow = prevStartRow1 + 2 + index;
+
+    return [
+        `= "T " & ${index + 1} & " - " & MID('Plan 2026'!A${item.planRow}; 4; 3)`,
+        hasPreviousMonth && salesPrevMonthCol ? `=Sales!${salesPrevMonthCol}${item.salesRow}` : "0",
+        "0",
+        hasPreviousMonth && planPrevMonthCol
+            ? `=IFERROR(B${targetRow} / 'Plan 2026'!${planPrevMonthCol}${item.planRow} - 1; 0)`
+            : "0"
+    ];
+});
+
+sheet.getRange(prevStartRow1 + 2, 1, 10, 4).setFormulas(sortedPrevFirstRows);
 
     const prevTotalRow1 = prevStartRow1 + 12;
     sheet.getRange(prevTotalRow1, 1).setValue("Total");
@@ -215,20 +234,37 @@ function GeneralGmvTablazat() {
 
     sheet.getRange(prevStartRow2 + 1, prevStartCol2, 1, 4).setValues([["TOP 20 DS", "GMV", "v. PL", "Quota"]]);
 
-    const prevTop20Data = [];
-    for (var i = 0; i < 20; i++) {
-        var id = ordersSheet.getRange(5 + i, 1).getValue();
-        var displayName = nameMap[id] || id;
+   const prevTop20Data = [];
 
-        prevTop20Data.push([
+for (var i = 0; i < 20; i++) {
+    var sourceRow = 5 + i;
+    var id = ordersSheet.getRange(sourceRow, 1).getValue();
+    var displayName = nameMap[id] || id;
+
+    var gmvValue = hasPreviousMonth && ordersPrevMonthCol
+        ? Number(ordersSheet.getRange(sourceRow, letterToColumn(ordersPrevMonthCol)).getValue()) || 0
+        : 0;
+
+    prevTop20Data.push({
+        gmv: gmvValue,
+        row: [
             displayName,
-            hasPreviousMonth && ordersPrevMonthCol ? `='Orders Coupon Nr'!${ordersPrevMonthCol}${5 + i}` : "0",
+            hasPreviousMonth && ordersPrevMonthCol ? `='Orders Coupon Nr'!${ordersPrevMonthCol}${sourceRow}` : "0",
             0,
             0
-        ]);
-    }
+        ]
+    });
+}
 
-    sheet.getRange(prevStartRow2 + 2, prevStartCol2, 20, 4).setValues(prevTop20Data);
+prevTop20Data.sort(function(a, b) {
+    return b.gmv - a.gmv;
+});
+
+sheet.getRange(prevStartRow2 + 2, prevStartCol2, 20, 4).setValues(
+    prevTop20Data.map(function(item) {
+        return item.row;
+    })
+);
 
     const prevTotalRow2 = prevStartRow2 + 22;
     sheet.getRange(prevTotalRow2, prevStartCol2).setValue("Total");
@@ -249,20 +285,39 @@ function GeneralGmvTablazat() {
     sheet.getRange(prevStartRow3 + 1, prevStartCol3 + 3).setValue("Profit");
 
     const prevWgrData = [];
-    for (var i = 0; i < 11; i++) {
-        var r = prevStartRow3 + 2 + i;
-        var germanName = wgrSheet.getRange("B" + (5 + i)).getValue().toString().trim();
-        var englishName = germanName ? LanguageApp.translate(germanName, 'de', 'en') : germanName;
 
-        prevWgrData.push([
-            englishName,
-            hasPreviousMonth && wgrPrevGmvCol ? `='WGR'!${wgrPrevGmvCol}${5 + i}` : "0",
-            `=IFERROR(IF(L${r}=0; 0; N${r} / L${r}); 0)`,
-            hasPreviousMonth && wgrPrevProfitCol ? `='WGR'!${wgrPrevProfitCol}${5 + i}` : "0"
-        ]);
-    }
+for (var i = 0; i < 11; i++) {
+    var sourceRow = 5 + i;
+    var germanName = wgrSheet.getRange("B" + sourceRow).getValue().toString().trim();
+    var englishName = germanName ? LanguageApp.translate(germanName, 'de', 'en') : germanName;
 
-    sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(prevWgrData);
+    var gmvValue = hasPreviousMonth && wgrPrevGmvCol
+        ? Number(wgrSheet.getRange(sourceRow, letterToColumn(wgrPrevGmvCol)).getValue()) || 0
+        : 0;
+
+    prevWgrData.push({
+        gmv: gmvValue,
+        sourceRow: sourceRow,
+        name: englishName
+    });
+}
+
+prevWgrData.sort(function(a, b) {
+    return b.gmv - a.gmv;
+});
+
+var sortedPrevWgrRows = prevWgrData.map(function(item, index) {
+    var targetRow = prevStartRow3 + 2 + index;
+
+    return [
+        item.name,
+        hasPreviousMonth && wgrPrevGmvCol ? `='WGR'!${wgrPrevGmvCol}${item.sourceRow}` : "0",
+        `=IFERROR(IF(L${targetRow}=0; 0; N${targetRow} / L${targetRow}); 0)`,
+        hasPreviousMonth && wgrPrevProfitCol ? `='WGR'!${wgrPrevProfitCol}${item.sourceRow}` : "0"
+    ];
+});
+
+sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(sortedPrevWgrRows);
 
     const prevTotalRow3 = prevStartRow3 + 13;
     sheet.getRange(prevTotalRow3, prevStartCol3).setValue("Total");
@@ -401,7 +456,65 @@ function GeneralGmvTablazat() {
     updateChartData();        // a régi diagram
     createHUMonthlyChart();   // ← az új diagram
 
-    SpreadsheetApp.flush();
+   // PPT formázás
+if (sheet.getName() === "Táblázatok") {
+
+    sheet.getDataRange()
+        .setFontSize(7)
+        .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP)
+        .setVerticalAlignment("middle");
+
+    for (var r = 1; r <= sheet.getMaxRows(); r++) {
+        sheet.setRowHeight(r, 21);
+    }
+
+    var lastCol = sheet.getLastColumn();
+
+    for (var c = 1; c <= lastCol; c++) {
+        sheet.autoResizeColumn(c);
+    }
+}
+
+// ==================== TÁBLÁZATOK - CÍMFORMÁZÁS ====================
+if (sheet.getName() === "Táblázatok") {
+
+    [
+        "A1:B1",
+        "C1:D1",
+        "F2:G2",
+        "H2:I2",
+        "K1:L1",
+        "M1:N1",
+        "A30:B30",
+        "C30:D30",
+        "F30:G30",
+        "H30:I30",
+        "K30:L30",
+        "M30:N30"
+    ].forEach(function(rangeA1) {
+
+        sheet.getRange(rangeA1)
+            .setFontSize(10);
+
+    });
+
+    [
+        "C1:D1",
+        "H2:I2",
+        "M1:N1",
+        "C30:D30",
+        "H30:I30",
+        "M30:N30"
+    ].forEach(function(rangeA1) {
+
+        sheet.getRange(rangeA1)
+            .setBackground("#ffffff")
+            .setFontColor("#000000");
+
+    });
+}
+
+SpreadsheetApp.flush();
 }
 // ====================== CHARTDATA ÉS DIAGRAM ======================
 
@@ -811,6 +924,19 @@ function getTotalColumn(sheet, startRow, startCol) {
     }
     return columnToLetter(col);
 }
+
+
+
+function letterToColumn(letter) {
+    var column = 0;
+
+    for (var i = 0; i < letter.length; i++) {
+        column = column * 26 + letter.charCodeAt(i) - 64;
+    }
+
+    return column;
+}
+
 
 function getProfitColumn(sheet) {
     let col = 3;
