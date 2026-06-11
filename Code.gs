@@ -172,6 +172,60 @@ function GeneralGmvTablazat() {
     sheet.getRange(totalRow3, startCol3 + 2).setFormula("=IFERROR(IF(L14=0;0; N14 / L14); 0)");
     sheet.getRange(totalRow3, startCol3 + 3).setFormula("=SUM(N3:N13)");
 
+
+
+// ==================== NEGYEDIK TÁBLA (SPEC WGR) ====================
+const startCol4 = 16; // P
+const startRow4 = 1;
+const specWgrCodes = ["9632", "9686", "9620", "9636"];
+
+sheet.getRange(startRow4, startCol4, 1, 2).merge().setValue("SPEC WGR");
+sheet.getRange(startRow4, startCol4 + 2, 1, 2).merge().setValue("GMV / PY/PL%");
+
+sheet.getRange(startRow4 + 1, startCol4).setValue("WGR");
+sheet.getRange(startRow4 + 1, startCol4 + 1).setValue("GMV");
+sheet.getRange(startRow4 + 1, startCol4 + 2).setValue("Margin");
+sheet.getRange(startRow4 + 1, startCol4 + 3).setValue("Profit");
+
+const specWgrData = [];
+
+specWgrCodes.forEach(function(code) {
+    var foundRow = findRowByCode(wgrSheet, code);
+
+    if (foundRow) {
+        var codeValue = wgrSheet.getRange(foundRow, 1).getValue().toString().trim();
+        var nameValue = wgrSheet.getRange(foundRow, 2).getValue().toString().trim();
+        var displayName = codeValue + " " + nameValue;
+        var targetRow = startRow4 + 2 + specWgrData.length;
+
+        specWgrData.push([
+            displayName,
+            `='WGR'!${wgrGmvCol}${foundRow}`,
+            `=IFERROR(IF(Q${targetRow}=0; 0; S${targetRow} / Q${targetRow}); 0)`,
+            `='WGR'!${wgrProfitCol}${foundRow}`
+        ]);
+    }
+});
+
+while (specWgrData.length < 4) {
+    specWgrData.push(["", 0, 0, 0]);
+}
+
+sheet.getRange(startRow4 + 2, startCol4, 4, 4).setValues(specWgrData);
+
+const totalRow4 = startRow4 + 6;
+sheet.getRange(totalRow4, startCol4).setValue("Total");
+sheet.getRange(totalRow4, startCol4 + 1).setFormula("=SUM(Q3:Q6)");
+sheet.getRange(totalRow4, startCol4 + 2).setFormula("=IFERROR(IF(Q7=0;0; S7 / Q7); 0)");
+sheet.getRange(totalRow4, startCol4 + 3).setFormula("=SUM(S3:S6)");
+
+
+
+
+
+
+
+
     // ==================== PLUSZ ELSŐ TÁBLA - ELŐZŐ HÓNAP (GMV STORES) ====================
     const prevStartRow1 = 30;
 
@@ -325,10 +379,67 @@ sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(sortedPrevWgrR
     sheet.getRange(prevTotalRow3, prevStartCol3 + 2).setFormula(`=IFERROR(IF(L${prevTotalRow3}=0;0; N${prevTotalRow3} / L${prevTotalRow3}); 0)`);
     sheet.getRange(prevTotalRow3, prevStartCol3 + 3).setFormula(`=SUM(N${prevStartRow3 + 2}:N${prevStartRow3 + 12})`);
 
-    // ==================== FORMÁZÁSOK ====================
-    const maxRow = Math.max(totalRow2, totalRow3, prevTotalRow1, prevTotalRow2, prevTotalRow3);
 
-    sheet.getRange("A1:N" + maxRow)
+
+
+
+// ==================== PLUSZ NEGYEDIK TÁBLA - ELŐZŐ HÓNAP (SPEC WGR) ====================
+const prevStartCol4 = 16; // P
+const prevStartRow4 = 30;
+
+sheet.getRange(prevStartRow4, prevStartCol4, 1, 2).merge().setValue("SPEC WGR");
+sheet.getRange(prevStartRow4, prevStartCol4 + 2, 1, 2).merge().setValue("GMV / PY/PL%");
+
+sheet.getRange(prevStartRow4 + 1, prevStartCol4).setValue("WGR");
+sheet.getRange(prevStartRow4 + 1, prevStartCol4 + 1).setValue("GMV");
+sheet.getRange(prevStartRow4 + 1, prevStartCol4 + 2).setValue("Margin");
+sheet.getRange(prevStartRow4 + 1, prevStartCol4 + 3).setValue("Profit");
+
+const prevSpecWgrData = [];
+
+specWgrCodes.forEach(function(code) {
+    var foundRow = findRowByCode(wgrSheet, code);
+
+    if (foundRow) {
+        var codeValue = wgrSheet.getRange(foundRow, 1).getValue().toString().trim();
+        var nameValue = wgrSheet.getRange(foundRow, 2).getValue().toString().trim();
+        var displayName = codeValue + " " + nameValue;
+        var targetRow = prevStartRow4 + 2 + prevSpecWgrData.length;
+
+        prevSpecWgrData.push([
+            displayName,
+            hasPreviousMonth && wgrPrevGmvCol ? `='WGR'!${wgrPrevGmvCol}${foundRow}` : "0",
+            `=IFERROR(IF(Q${targetRow}=0; 0; S${targetRow} / Q${targetRow}); 0)`,
+            hasPreviousMonth && wgrPrevProfitCol ? `='WGR'!${wgrPrevProfitCol}${foundRow}` : "0"
+        ]);
+    }
+});
+
+while (prevSpecWgrData.length < 4) {
+    prevSpecWgrData.push(["", 0, 0, 0]);
+}
+
+sheet.getRange(prevStartRow4 + 2, prevStartCol4, 4, 4).setValues(prevSpecWgrData);
+
+const prevTotalRow4 = prevStartRow4 + 6;
+sheet.getRange(prevTotalRow4, prevStartCol4).setValue("Total");
+sheet.getRange(prevTotalRow4, prevStartCol4 + 1).setFormula(`=SUM(Q${prevStartRow4 + 2}:Q${prevStartRow4 + 5})`);
+sheet.getRange(prevTotalRow4, prevStartCol4 + 2).setFormula(`=IFERROR(IF(Q${prevTotalRow4}=0;0; S${prevTotalRow4} / Q${prevTotalRow4}); 0)`);
+sheet.getRange(prevTotalRow4, prevStartCol4 + 3).setFormula(`=SUM(S${prevStartRow4 + 2}:S${prevStartRow4 + 5})`);
+
+
+
+
+
+
+
+
+
+    // ==================== FORMÁZÁSOK ====================
+    const maxRow = Math.max(totalRow2, totalRow3, totalRow4, prevTotalRow1, prevTotalRow2, prevTotalRow3, prevTotalRow4);
+
+
+    sheet.getRange("A1:S" + maxRow)
         .setFontFamily("Arial")
         .setBorder(true, true, true, true, true, true, "#d9d9d9", SpreadsheetApp.BorderStyle.SOLID);
 
@@ -372,6 +483,28 @@ sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(sortedPrevWgrR
     sheet.getRange("K" + totalRow3).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
     sheet.getRange("L" + totalRow3 + ":N" + totalRow3).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
 
+    
+    // SPEC WGR felső tábla formázása
+sheet.getRange("P1:S1").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
+sheet.getRange("P1:Q1").setBackground(darkBlue).setFontColor("#ffffff");
+sheet.getRange("R1:S1")
+    .setBackground("#ffffff")
+    .setFontColor("#000000")
+    .setFontWeight("bold");
+sheet.getRange("P2").setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+sheet.getRange("Q2:S2").setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold").setHorizontalAlignment("center");
+
+sheet.getRange("P3:P6").setBackground(lightBlue).setFontWeight("bold").setHorizontalAlignment("center").setFontSize(9);
+sheet.getRange("Q3:Q6").setBackground("#ffffff");
+sheet.getRange("S3:S6").setBackground("#ffffff");
+sheet.getRange("R3:R6").setBackground("#efefef");
+
+sheet.getRange("P" + totalRow4).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
+sheet.getRange("Q" + totalRow4 + ":S" + totalRow4).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+    
+    
+    
+    
     // ==================== ELŐZŐ HÓNAP TÁBLÁK FORMÁZÁSA ====================
     sheet.getRange("A30:D30").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
     sheet.getRange("F30:I30").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
@@ -417,22 +550,78 @@ sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(sortedPrevWgrR
 
     sheet.getRange("K" + prevTotalRow3).setBackground(darkBlue).setFontColor("#ffffff").setFontWeight("bold");
     sheet.getRange("L" + prevTotalRow3 + ":N" + prevTotalRow3).setBackground(lightBlue).setFontColor("#000000").setFontWeight("bold");
+    
+    // SPEC WGR előző havi tábla formázása
+sheet.getRange("P30:S30").setFontSize(14).setHorizontalAlignment("center").setFontWeight("bold");
+
+sheet.getRange("P30:Q30")
+    .setBackground(darkBlue)
+    .setFontColor("#ffffff");
+
+sheet.getRange("R30:S30")
+    .setBackground("#ffffff")
+    .setFontColor("#000000")
+    .setFontWeight("bold");
+
+sheet.getRange("P31")
+    .setBackground(darkBlue)
+    .setFontColor("#ffffff")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+
+sheet.getRange("Q31:S31")
+    .setBackground(lightBlue)
+    .setFontColor("#000000")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+
+sheet.getRange("P32:P35")
+    .setBackground(lightBlue)
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center")
+    .setFontSize(9);
+
+sheet.getRange("Q32:Q35")
+    .setBackground("#ffffff");
+
+sheet.getRange("S32:S35")
+    .setBackground("#ffffff");
+
+sheet.getRange("R32:R35")
+    .setBackground("#efefef");
+
+sheet.getRange("P" + prevTotalRow4)
+    .setBackground(darkBlue)
+    .setFontColor("#ffffff")
+    .setFontWeight("bold");
+
+sheet.getRange("Q" + prevTotalRow4 + ":S" + prevTotalRow4)
+    .setBackground(lightBlue)
+    .setFontColor("#000000")
+    .setFontWeight("bold");
 
     sheet.getRange("B3:B13").setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("G4:G23").setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("L3:L" + totalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("N3:N" + totalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
 
+    sheet.getRange("Q3:Q" + totalRow4).setNumberFormat("#,##0").setHorizontalAlignment("right");
+sheet.getRange("S3:S" + totalRow4).setNumberFormat("#,##0").setHorizontalAlignment("right");
+
     sheet.getRange("C3:D13").setNumberFormat("0.00%").setHorizontalAlignment("right");
     sheet.getRange("M3:M" + totalRow3).setNumberFormat("0.0%").setHorizontalAlignment("right");
+    sheet.getRange("R3:R" + totalRow4).setNumberFormat("0.0%").setHorizontalAlignment("right");
 
     sheet.getRange("B32:B" + prevTotalRow1).setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("G32:G" + prevTotalRow2).setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("L32:L" + prevTotalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
     sheet.getRange("N32:N" + prevTotalRow3).setNumberFormat("#,##0").setHorizontalAlignment("right");
+    sheet.getRange("Q32:Q" + prevTotalRow4).setNumberFormat("#,##0").setHorizontalAlignment("right");
+sheet.getRange("S32:S" + prevTotalRow4).setNumberFormat("#,##0").setHorizontalAlignment("right");
 
     sheet.getRange("C32:D" + prevTotalRow1).setNumberFormat("0.00%").setHorizontalAlignment("right");
     sheet.getRange("M32:M" + prevTotalRow3).setNumberFormat("0.0%").setHorizontalAlignment("right");
+    sheet.getRange("R32:R" + prevTotalRow4).setNumberFormat("0.0%").setHorizontalAlignment("right");
 
     sheet.setColumnWidth(1, 140);
     sheet.setColumnWidth(2, 95);
@@ -446,6 +635,10 @@ sheet.getRange(prevStartRow3 + 2, prevStartCol3, 11, 4).setValues(sortedPrevWgrR
     sheet.setColumnWidth(12, 95);
     sheet.setColumnWidth(13, 80);
     sheet.setColumnWidth(14, 95);
+    sheet.setColumnWidth(16, 180);
+sheet.setColumnWidth(17, 95);
+sheet.setColumnWidth(18, 80);
+sheet.setColumnWidth(19, 95);
 
     for (var r = 1; r <= maxRow; r++) {
         sheet.setRowHeight(r, 28);
@@ -914,6 +1107,24 @@ function createColumnChart(chartSheet, numMonths) {
     chartSheet.insertChart(chart);
 }
 // ==================== SEGÉDFÜGGVÉNYEK ====================
+
+function findRowByCode(sheet, code) {
+    var values = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
+
+    for (var i = 0; i < values.length; i++) {
+        if (values[i][0].toString().trim() === code.toString().trim()) {
+            return i + 1;
+        }
+    }
+
+    return null;
+}
+
+
+
+
+
+
 function getTotalColumn(sheet, startRow, startCol) {
     let col = startCol;
     while (true) {
