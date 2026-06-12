@@ -56,6 +56,16 @@ function GeneralGmvTablazat() {
     const darkBlue = "#4a86e8";
     const lightBlue = "#8fb4ff";
 
+    const pieColors = [
+    "#1c5aa6", // sötétkék
+    "#b8c8e5", // világoskék
+    "#3f6e18", // zöld
+    "#4f76b5"  // középkék
+];
+
+
+
+
     // ==================== NÉV LEKÉPEZÉS ====================
     const nameMap = {
         "2090951000172": "Viktor D.",
@@ -648,6 +658,8 @@ sheet.setColumnWidth(19, 95);
        
     updateChartData();        // a régi diagram
     createHUMonthlyChart();   // ← az új diagram
+    createSpecWgrPieCharts();
+   
 
    // PPT formázás
 if (sheet.getName() === "Táblázatok") {
@@ -1121,6 +1133,174 @@ function findRowByCode(sheet, code) {
 }
 
 
+
+
+
+
+
+function createSpecWgrPieCharts() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var tableSheet = ss.getSheetByName("Táblázatok");
+    var chartSheet = ss.getSheetByName("ChartData");
+    var salesShareSheet = ss.getSheetByName("Sales Share 2026");
+
+    if (!tableSheet || !chartSheet || !salesShareSheet) return;
+
+    chartSheet.getCharts().forEach(function(chart) {
+        var info = chart.getContainerInfo();
+
+        if (
+            info.getAnchorRow() >= 52 &&
+            info.getAnchorRow() <= 90 &&
+            info.getAnchorColumn() >= 1 &&
+            info.getAnchorColumn() <= 20
+        ) {
+            chartSheet.removeChart(chart);
+        }
+    });
+
+    // SPEC WGR helper
+    chartSheet.getRange("A46:B50").clearContent();
+    chartSheet.getRange("H46:I50").clearContent();
+
+    chartSheet.getRange("A46:B46").setValues([["WGR", "GMV"]]);
+    chartSheet.getRange("A47:B50").setValues(
+        tableSheet.getRange("P3:Q6").getValues()
+    );
+
+    chartSheet.getRange("H46:I46").setValues([["WGR", "GMV"]]);
+    chartSheet.getRange("H47:I50").setValues(
+        tableSheet.getRange("P32:Q35").getValues()
+    );
+
+    // SALES SHARE YTD helper
+    var allowedNames = ["E-com", "Design Studio", "PRO", "C&C"];
+    var salesShareData = [["Channel", "YTD"]];
+
+    for (var r = 23; r <= 29; r++) {
+        var name = salesShareSheet.getRange("F" + r).getValue().toString().trim();
+
+        if (allowedNames.indexOf(name) !== -1) {
+            var value = Number(salesShareSheet.getRange("S" + r).getValue()) || 0;
+            salesShareData.push([name, value]);
+        }
+    }
+
+    chartSheet.getRange("A72:B80").clearContent();
+    chartSheet.getRange(72, 1, salesShareData.length, 2).setValues(salesShareData);
+
+    SpreadsheetApp.flush();
+
+    function insertSpecPieChart(rangeA1, title, row, col) {
+
+    var chart = chartSheet.newChart()
+        .setChartType(Charts.ChartType.PIE)
+
+        .setOption("backgroundColor", "#0B5394")
+
+        .addRange(chartSheet.getRange(rangeA1))
+        .setNumHeaders(1)
+        .setPosition(row, col, 0, 0)
+
+        .setOption("title", title)
+
+        .setOption("legend", {
+            position: "right",
+            textStyle: {
+                color: "#ffffff"
+            }
+        })
+
+        .setOption("titleTextStyle", {
+            color: "#ffffff"
+        })
+
+        .setOption("width", 520)
+        .setOption("height", 320)
+
+        .build();
+
+    chartSheet.insertChart(chart);
+}
+
+function insertSpecPieChart(rangeA1, title, row, col) {
+    var chart = chartSheet.newChart()
+        .setChartType(Charts.ChartType.PIE)
+        .setOption("backgroundColor", "#0B5394")
+        .addRange(chartSheet.getRange(rangeA1))
+        .setNumHeaders(1)
+        .setPosition(row, col, 0, 0)
+        .setOption("title", title)
+        .setOption("legend", {
+            position: "right",
+            textStyle: { color: "#ffffff" }
+        })
+        .setOption("titleTextStyle", {
+            color: "#ffffff"
+        })
+        .setOption("width", 520)
+        .setOption("height", 320)
+        .build();
+
+    chartSheet.insertChart(chart);
+}
+
+
+function insertSalesShareDonutChart(rangeA1, title, row, col) {
+    var chart = chartSheet.newChart()
+        .setChartType(Charts.ChartType.PIE)
+        .setOption("backgroundColor", "#0B5394")
+        .addRange(chartSheet.getRange(rangeA1))
+        .setNumHeaders(1)
+        .setPosition(row, col, 0, 0)
+        .setOption("title", title)
+        .setOption("titleTextStyle", {
+            color: "#ffffff",
+            fontSize: 13,
+            bold: true
+        })
+        .setOption("legend", {
+            position: "none"
+        })
+        .setOption("pieHole", 0.45)
+        .setOption("is3D", true)
+        .setOption("pieSliceText", "none")
+        .setOption("colors", [
+            "#4a86e8",
+            "#6fa8dc",
+            "#00ffff",
+            "#b4c7e7"
+        ])
+        .setOption("width", 520)
+        .setOption("height", 320)
+        .build();
+
+    chartSheet.insertChart(chart);
+}
+
+
+insertSpecPieChart(
+    "A46:B50",
+    "SPEC WGR GMV YTD",
+    52,
+    1
+);
+
+insertSpecPieChart(
+    "H46:I50",
+    "SPEC WGR GMV Previous Month",
+    52,
+    8
+);
+
+insertSalesShareDonutChart(
+    "A72:B" + (71 + salesShareData.length),
+    "Sales Share YTD",
+    78,
+    1
+);
+    SpreadsheetApp.flush();
+}
 
 
 
